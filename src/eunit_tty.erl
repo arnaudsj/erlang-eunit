@@ -33,7 +33,7 @@
 		succeed = 0,
 		fail = 0,
 		abort = 0,
-		skip = 0,
+		skip = false,
 		indent = 0,
 		prefix       % prefix of cancelled tests
 	       }).
@@ -52,12 +52,12 @@ init(Id, List, St0) ->
 	    if St0#state.verbose -> print_header();
 	       true -> ok
 	    end,
-	    St = group_begin(Id, "", List, reset_prefix(St0)),
+	    St = entry_begin(Id, "", List, reset_prefix(St0)),
 	    receive
 		{stop, Reference, ReplyTo} ->
 		    Result = if St#state.fail =:= 0,
 				St#state.abort =:= 0,
-				St#state.skip =:= 0 ->
+				St#state.skip =:= false ->
 				     ok;
 				true ->
 				     error
@@ -84,23 +84,35 @@ report(ok, St) ->
     end;
 report(error, St) ->
     print_bar(),
-    io:fwrite("  Failed: ~w.  Aborted: ~w."
-	      "  Skipped: ~w.  Succeeded: ~w.\n",
-	      [St#state.fail, St#state.abort,
-	       St#state.skip, St#state.succeed]).
+    io:fwrite("  Failed: ~w.  Aborted: ~w.  Succeeded: ~w.\n",
+	      [St#state.fail, St#state.abort, St#state.succeed]),
+    if St#state.skip =:= true ->
+	    io:fwrite("One or more tests were skipped.\n");
+       true -> ok
+    end.
 
 print_header() ->
-    io:fwrite("======================== EUnit "
-	      "========================\n").
+    io:fwrite("======================== EUnit ========================\n").
 
 print_bar() ->
-    io:fwrite("============================"
-	      "===========================\n").    
+    io:fwrite("=======================================================\n").
 
 reset_prefix(St) ->
     St#state{prefix = [-1]}.  % never matches real test id:s
 
-wait(Id, St) ->
+%% waiting for [..., M, N] begin
+%% get:
+%%      [..., M, N] begin test  -> expect [..., M, N] end    (test begin)
+%%      [..., M, N] begin group -> expect [..., M, N, 1] end (group begin)
+%%      [..., M] end -> expect [..., M+1] begin        (parent end)
+%%      cancel([..., M])                               (parent cancel)
+%%
+%% waiting for [..., M, N] end
+%% get:
+%%      [..., M, N] end -> expect [..., M, N+1] begin    (seen end)
+%%      cancel([..., M, N])                              (cancelled)
+
+wait(Id, Type, St) ->
     %%?debugVal({waiting_for, Id}),
     case lists:prefix(St#state.prefix, Id) of
 	true ->
@@ -109,78 +121,66 @@ wait(Id, St) ->
 	    {{cancel, undefined}, St};
 	false ->
 	    receive
-		{status, Id1, {cancel, Reason}} ->
+		{status, Id, {cancel, Reason}} ->
+		    %%?debugVal({got_cancel, Id, Reason}),
+		    {{cancel, Reason}, St#state{prefix=Id}};
+		{status, Id1, {cancel, _Reason}} ->
 		    %%?debugVal({got_cancel, Id1, Reason}),
-		    {{cancel, Reason}, St#state{prefix=Id1}};
-		{status, Id, Data} ->
+		    %% Id1 should be parent of Id in this case
+		    {{cancel, undefined}, St#state{prefix=Id1}};
+		{status, Id, {progress, Type, Data}} ->
 		    %%?debugVal({got_status, Id, Data}),
-		    {Data, reset_prefix(St)}
+		    {{progress, Data}, reset_prefix(St)}
 	    end
     end.
 
 entry({item, Id, Desc, Loc}, St) ->
-    test_begin(Id, Desc, Loc, St);
+    entry_begin(Id, Desc, Loc, St);
 entry({group, Id, Desc, Es}, St) ->
-    group_begin(Id, Desc, Es, St).
+    entry_begin(Id, Desc, Es, St).
 
 tests([E | Es], St) ->
     tests(Es, entry(E, St));
 tests([], St) ->
     St.
 
-test_begin(Id, Desc, {{Module, Name, Arity}, Line}, St) ->
-    Text = format_test_begin(Module, Name, Arity, Line, Desc),
-    if St#state.verbose -> print_test_begin(St#state.indent, Text);
-       true -> ok
-    end,
-    case wait(Id, St) of
-	{{progress, 'begin', test}, St1} ->
-	    test_end(Id, Text, St1);
+entry_begin(Id, Desc, Data, St) ->
+    case wait(Id, 'begin', St) of
+	{{progress, test}, St1} ->
+	    TestBegin = fun () ->
+				print_test_begin(St1#state.indent,
+						 Data, Desc)
+			end,
+	    if St#state.verbose -> TestBegin();
+	       true -> ok
+	    end,
+	    test_end(Id, TestBegin, St1);
+	{{progress, group}, St1} ->
+	    I = St1#state.indent,
+	    St2 = if Desc /= "", St1#state.verbose ->
+			  print_group_start(I, Desc),
+			  St1#state{indent = I + 1};
+		     true ->
+			  St1
+		  end,
+	    group_end(Id, I, Desc, tests(Data, St2));
 	{{cancel, Reason}, St1} ->
-	    if St#state.verbose -> print_test_cancel(Reason);
+	    TestBegin = fun () ->
+				print_test_begin(St1#state.indent,
+						 Data, Desc)
+			end,
+	    if St1#state.verbose -> TestBegin();
+	       true -> ok
+	    end,
+	    if St1#state.verbose -> print_test_cancel(Reason);
 	       Reason /= undefined ->
-		    print_test_begin(St#state.indent, Text),
+		    TestBegin(),
 		    print_test_cancel(Reason);
 	       true -> ok
 	    end,
-	    St1#state{skip = St1#state.skip + 1}
-    end.
-
-test_end(Id, Text, St) ->
-    case wait(Id, St) of
-	{{progress, 'end', {Result, Time, Output}}, St1} ->
-	    if Result =:= ok ->
-		    if St#state.verbose -> print_test_end(Time);
-		       true -> ok
-		    end,
-		    St1#state{succeed = St1#state.succeed + 1};
-	       true ->
-		    if St#state.verbose -> ok;
-		       true -> print_test_begin(St#state.indent, Text)
-		    end,
-		    print_test_error(Result, Output),
-		    St1#state{fail = St1#state.fail + 1}
-	    end;
-	{{cancel, Reason}, St1} ->
-	    if St#state.verbose -> ok;
-	       true -> print_test_begin(St#state.indent, Text)
-	    end,
-	    print_test_cancel(Reason),
-	    St1#state{abort = St1#state.abort + 1}
-    end.
-
-group_begin(Id, Desc, Es, St0) ->
-    I = St0#state.indent,
-    St = if Desc /= "", St0#state.verbose ->
-		 print_group_start(I, Desc),
-		 St0#state{indent = I + 1};
-	    true ->
-		 St0
-	 end,
-    case wait(Id, St) of
-	{{progress, 'begin', group}, St1} ->
-	    group_end(Id, I, Desc, tests(Es, St1));
-	{{cancel, Reason}, St1} ->
+	    St1#state{skip = true};
+	{{cancell, Reason}, St1} ->
+	    I = St1#state.indent,
 	    if Desc /= "", St1#state.verbose ->
 		    print_group_cancel(I, Reason);
 	       Desc /= "" ->
@@ -189,31 +189,57 @@ group_begin(Id, Desc, Es, St0) ->
 	       true ->
 		    ok
 	    end,
-	    %% TODO: eliminate this size calculation if possible
-	    Size = eunit_data:list_size(Es),
-	    St1#state{indent = I, skip = St1#state.skip + Size}
+	    St1#state{indent = I, skip = true}
+    end.
+
+%% group_begin(Id, Desc, Es, St0) ->
+%%     case wait(Id, 'begin', St0) of
+%%     end.
+
+test_end(Id, Begin, St) ->
+    case wait(Id, 'end', St) of
+	{{progress, {Result, Time, Output}}, St1} ->
+	    if Result =:= ok ->
+		    if St#state.verbose -> print_test_end(Time);
+		       true -> ok
+		    end,
+		    St1#state{succeed = St1#state.succeed + 1};
+	       true ->
+		    if St#state.verbose -> ok;
+		       true -> Begin()
+		    end,
+		    print_test_error(Result, Output),
+		    St1#state{fail = St1#state.fail + 1}
+	    end;
+	{{cancel, Reason}, St1} ->
+	    if St#state.verbose -> ok;
+	       true -> Begin()
+	    end,
+	    print_test_cancel(Reason),
+	    St1#state{abort = St1#state.abort + 1}
     end.
 
 group_end(Id, I, Desc, St) ->
-    (case wait(Id, St) of
-	 {{progress, 'end', {_Count, Time, _Output}}, St1} ->
-	     if Desc /= "", St#state.verbose ->
-		     print_group_end(St1#state.indent, Time);
-		true ->
-		     ok
-	     end,
-	     St1;
-	 {{cancel, undefined}, St1} ->
-	     St1;  %% "skipped" message is not interesting here
-	 {{cancel, Reason}, St1} ->
-	     if Desc /= "", St1#state.verbose ->
-		     print_group_cancel(I, Reason);
-		true ->
-		     print_group_start(I, Desc),
-		     print_group_cancel(I, Reason)
-	     end,
-	     St1
-     end)#state{indent = I}.
+    case wait(Id, 'end', St) of
+	{{progress, {_Count, Time, _Output}}, St1} ->
+	    if Desc /= "", St#state.verbose ->
+		    print_group_end(St1#state.indent, Time);
+	       true ->
+		    ok
+	    end,
+	    St1#state{indent = I};
+	{{cancel, undefined}, St1} ->
+	    %% "skipped" message is not interesting here
+	    St1#state{indent = I};
+	{{cancel, Reason}, St1} ->
+	    if Desc /= "", St1#state.verbose ->
+		    print_group_cancel(I, Reason);
+	       true ->
+		    print_group_start(I, Desc),
+		    print_group_cancel(I, Reason)
+	    end,
+	    St1#state{indent = I}
+    end.
 
 indent(N) when is_integer(N), N >= 1 ->
     io:put_chars(lists:duplicate(N * 2, $\s));
@@ -232,18 +258,15 @@ print_group_end(I, Time) ->
 	    ok
     end.
 
-format_test_begin(Module, Name, _Arity, Line, Desc) ->
+print_test_begin(I, {{Module, Name, _Arity}, Line}, Desc) ->
+    indent(I),
     L = if Line =:= 0 -> "";
 	   true -> io_lib:fwrite("~w:", [Line])
 	end,
     D = if Desc =:= "" -> "";
 	   true -> io_lib:fwrite(" (~s)", [Desc])
 	end,
-    io_lib:fwrite("~s:~s ~s~s...", [Module, L, Name, D]).
-
-print_test_begin(I, Text) ->
-    indent(I),
-    io:put_chars(Text).
+    io:fwrite("~s:~s ~s~s...", [Module, L, Name, D]).
 
 print_test_end(Time) ->
     T = if Time > 0 -> io_lib:fwrite("[~.3f s] ", [Time/1000]);

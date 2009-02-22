@@ -130,7 +130,7 @@ wait(Id, Type, St) ->
 		    {{cancel, undefined}, St#state{prefix=Id1}};
 		{status, Id, {progress, Type, Data}} ->
 		    %%?debugVal({got_status, Id, Data}),
-		    {{progress, Data}, reset_prefix(St)}
+		    {Data, reset_prefix(St)}
 	    end
     end.
 
@@ -146,7 +146,7 @@ tests([], St) ->
 
 item_begin(Id, Desc, Data, St) ->
     case wait(Id, 'begin', St) of
-	{{progress, test}, St1} ->
+	{{test, _Info}, St1} ->
 	    TestBegin = fun () ->
 				print_test_begin(St1#state.indent,
 						 Data, Desc)
@@ -174,7 +174,7 @@ item_begin(Id, Desc, Data, St) ->
 
 group_begin(Id, Desc, Data, St) ->
     case wait(Id, 'begin', St) of
-	{{progress, group}, St1} ->
+	{{group, _Info}, St1} ->
 	    I = St1#state.indent,
 	    St2 = if Desc /= "", St1#state.verbose ->
 			  print_group_start(I, Desc),
@@ -198,7 +198,7 @@ group_begin(Id, Desc, Data, St) ->
 
 test_end(Id, Begin, St) ->
     case wait(Id, 'end', St) of
-	{{progress, {Result, Time, Output}}, St1} ->
+	{{Result, Time, Output}, St1} ->
 	    if Result =:= ok ->
 		    if St#state.verbose -> print_test_end(Time);
 		       true -> ok
@@ -221,7 +221,7 @@ test_end(Id, Begin, St) ->
 
 group_end(Id, I, Desc, St) ->
     case wait(Id, 'end', St) of
-	{{progress, {_Count, Time, _Output}}, St1} ->
+	{{_Count, Time, _Output}, St1} ->
 	    if Desc /= "", St#state.verbose ->
 		    print_group_end(St1#state.indent, Time);
 	       true ->

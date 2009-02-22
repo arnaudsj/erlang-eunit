@@ -57,7 +57,7 @@ start(Tests, Order, Super, Reference)
 %% where Id identifies the item that the message pertains to, and the
 %% Info part can be one of:
 %%
-%%   {progress, 'begin', test | group}
+%%   {progress, 'begin', {test | group, Info}}
 %%       indicates that the item has been entered, and what type it is
 %%
 %%   {progress, 'end', {Status, Time::integer(), Output::binary()}}
@@ -221,8 +221,8 @@ insulator_process(Type, Fun, St0) ->
 
 insulator_wait(Child, Parent, Buf, St) ->
     receive
-	{child, Child, Id, {progress, {'begin', Class}}} ->
-	    message_super(Id, {progress, 'begin', Class}, St),
+	{child, Child, Id, {progress, {'begin', Data}}} ->
+	    message_super(Id, {progress, 'begin', Data}, St),
 	    insulator_wait(Child, Parent, [[] | Buf], St);
 	{child, Child, Id, {progress, {'end', {Status, Time}}}} ->
 	    Msg = {Status, Time, list_to_binary(lists:reverse(hd(Buf)))},
@@ -456,7 +456,8 @@ handle_item(T, St) ->
     end.
 
 handle_test(T, St) ->
-    message_insulator(progress, {'begin', test}, St),
+    Info = {T#test.desc, T#test.location, T#test.line},
+    message_insulator(progress, {'begin', {test, Info}}, St),
     {Status, Time} = with_timeout(T#test.timeout, ?DEFAULT_TEST_TIMEOUT,
 				  fun () -> run_test(T) end, St),
     message_insulator(progress, {'end', {Status, Time}}, St),
@@ -502,7 +503,8 @@ run_group(T, St) ->
     %% note that the setup/cleanup is outside the group timeout; if the
     %% setup fails, we do not start any timers
     Timeout = T#group.timeout,
-    message_insulator(progress, {'begin', group}, St),
+    Info = {T#group.desc, [{spawn,T#group.spawn},{order,T#group.order}]},
+    message_insulator(progress, {'begin', {group, Info}}, St),
     F = fun (G) -> enter_group(G, Timeout, St) end,
     try with_context(T, F) of
 	{Status, Time} ->

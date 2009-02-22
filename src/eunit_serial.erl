@@ -89,7 +89,7 @@ item(Id, ParentId, GroupMinSize, St0) ->
 	    %%?debugVal({got_begin, Id, Msg}),
 	    cast(Msg, St1),
 	    St2 = case Msg of
-		      {status, _, {progress, 'begin', group}} ->
+		      {status, _, {progress, 'begin', {group, _Info}}} ->
 			  items(Id, 0, St1);
 		      _ ->
 			  St1
@@ -149,7 +149,7 @@ wait(Id, Type, ParentId, GroupMinSize, St) ->
 %% the event has not yet arrived or been cancelled - wait for more info
 wait_1(Id, Type, ParentId, GroupMinSize, St) ->
     receive
-	{status, Id, {progress, Type, _}}=Msg ->
+	{status, Id, {progress, Type, _Data}}=Msg ->
 	    %%?debugVal({Type, ParentId, Id}),
 	    {ok, Msg, St};
 	{status,ParentId,{progress,'end',{GroupMinSize,_,_}}}=Msg ->

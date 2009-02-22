@@ -19,8 +19,14 @@
 %% @copyright 2006 Richard Carlsson
 %% @private
 %% @see eunit
-%% @doc Event serializing process which works as an adapter and
-%% multiplexer for "supervisor" processes
+%% @doc Event serializing and multiplexing process, to be used as the
+%% main "supervisor" process for en EUnit test runner. See eunit_proc
+%% for details about the events that will be sent to the listeners
+%% (provided to this process at startup). This process guarantees that
+%% listeners will receive events in order, even if tests execute in
+%% parallel. For every received 'begin' event, there will be exactly one
+%% 'end' or 'cancel' event. For a cancelling event with identifier Id,
+%% no further events will arrive whose identifiers have Id as prefix.
 
 -module(eunit_serial).
 

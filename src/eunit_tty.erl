@@ -52,7 +52,7 @@ init(Id, List, St0) ->
 	    if St0#state.verbose -> print_header();
 	       true -> ok
 	    end,
-	    St = entry_begin(Id, "", List, reset_prefix(St0)),
+	    St = group_begin(Id, "", List, reset_prefix(St0)),
 	    receive
 		{stop, Reference, ReplyTo} ->
 		    Result = if St#state.fail =:= 0,
@@ -135,16 +135,16 @@ wait(Id, Type, St) ->
     end.
 
 entry({item, Id, Desc, Loc}, St) ->
-    entry_begin(Id, Desc, Loc, St);
+    item_begin(Id, Desc, Loc, St);
 entry({group, Id, Desc, Es}, St) ->
-    entry_begin(Id, Desc, Es, St).
+    group_begin(Id, Desc, Es, St).
 
 tests([E | Es], St) ->
     tests(Es, entry(E, St));
 tests([], St) ->
     St.
 
-entry_begin(Id, Desc, Data, St) ->
+item_begin(Id, Desc, Data, St) ->
     case wait(Id, 'begin', St) of
 	{{progress, test}, St1} ->
 	    TestBegin = fun () ->
@@ -155,15 +155,6 @@ entry_begin(Id, Desc, Data, St) ->
 	       true -> ok
 	    end,
 	    test_end(Id, TestBegin, St1);
-	{{progress, group}, St1} ->
-	    I = St1#state.indent,
-	    St2 = if Desc /= "", St1#state.verbose ->
-			  print_group_start(I, Desc),
-			  St1#state{indent = I + 1};
-		     true ->
-			  St1
-		  end,
-	    group_end(Id, I, Desc, tests(Data, St2));
 	{{cancel, Reason}, St1} ->
 	    TestBegin = fun () ->
 				print_test_begin(St1#state.indent,
@@ -178,8 +169,21 @@ entry_begin(Id, Desc, Data, St) ->
 		    print_test_cancel(Reason);
 	       true -> ok
 	    end,
-	    St1#state{skip = true};
-	{{cancell, Reason}, St1} ->
+	    St1#state{skip = true}
+    end.
+
+group_begin(Id, Desc, Data, St) ->
+    case wait(Id, 'begin', St) of
+	{{progress, group}, St1} ->
+	    I = St1#state.indent,
+	    St2 = if Desc /= "", St1#state.verbose ->
+			  print_group_start(I, Desc),
+			  St1#state{indent = I + 1};
+		     true ->
+			  St1
+		  end,
+	    group_end(Id, I, Desc, tests(Data, St2));
+	{{cancel, Reason}, St1} ->
 	    I = St1#state.indent,
 	    if Desc /= "", St1#state.verbose ->
 		    print_group_cancel(I, Reason);
@@ -191,10 +195,6 @@ entry_begin(Id, Desc, Data, St) ->
 	    end,
 	    St1#state{indent = I, skip = true}
     end.
-
-%% group_begin(Id, Desc, Es, St0) ->
-%%     case wait(Id, 'begin', St0) of
-%%     end.
 
 test_end(Id, Begin, St) ->
     case wait(Id, 'end', St) of

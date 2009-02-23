@@ -69,12 +69,12 @@ serializer(Pids) ->
     St = #state{listeners = sets:from_list(Pids),
 		cancelled = eunit_lib:trie_new(),
 		messages = dict:new()},
-    item([], undefined, 0, St),
+    expect([], undefined, 0, St),
     exit(normal).
 
 %% collect beginning and end of an expected item; return {Done, NewSt}
 %% where Done is true if there are no more items of this group
-item(Id, ParentId, GroupMinSize, St0) ->
+expect(Id, ParentId, GroupMinSize, St0) ->
     case wait(Id, 'begin', ParentId, GroupMinSize, St0) of
 	{done, St1} ->
 	    {true, St1};
@@ -90,7 +90,7 @@ item(Id, ParentId, GroupMinSize, St0) ->
 	    cast(Msg, St1),
 	    St2 = case Msg of
 		      {status, _, {progress, 'begin', {group, _Info}}} ->
-			  items(Id, 0, St1);
+			  group(Id, 0, St1);
 		      _ ->
 			  St1
 		  end,
@@ -109,11 +109,11 @@ item(Id, ParentId, GroupMinSize, St0) ->
     end.
 
 %% collect group items in order until group is done
-items(ParentId, GroupMinSize, St) ->
+group(ParentId, GroupMinSize, St) ->
     N = GroupMinSize + 1,
-    case item(ParentId ++ [N], ParentId, GroupMinSize, St) of
+    case expect(ParentId ++ [N], ParentId, GroupMinSize, St) of
 	{false, St1} ->
-	    items(ParentId, N, St1);
+	    group(ParentId, N, St1);
 	{true, St1} ->
 	    St1
     end.

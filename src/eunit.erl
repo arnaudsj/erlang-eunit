@@ -144,20 +144,11 @@ test(Tests, Options) ->
 %% @private
 %% @doc See {@link test/2}.
 test(Server, Tests, Options) ->
-    %% TODO: try to eliminate call to list/1
-    try eunit_data:list(Tests) of
-	List ->
-	    Listeners = [eunit_tty:start(List, Options)
-			 | listeners(Options)],
-	    Serial = eunit_serial:start(Listeners),
-	    case eunit_server:start_test(Server, Serial, Tests, Options) of
-		{ok, Reference} -> test_run(Reference, Listeners);
-		{error, R} -> {error, R}
-	    end
-    catch
-	{error, R} ->
-	    io:put_chars(eunit_lib:format_error(R)),
-	    {error, R}
+    Listeners = [eunit_tty:start(Options) | listeners(Options)],
+    Serial = eunit_serial:start(Listeners),
+    case eunit_server:start_test(Server, Serial, Tests, Options) of
+	{ok, Reference} -> test_run(Reference, Listeners);
+	{error, R} -> {error, R}
     end.
 
 test_run(Reference, Listeners) ->

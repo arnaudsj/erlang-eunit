@@ -32,10 +32,10 @@
 -export([start/0, stop/0, test/1, test/2]).
 
 %% Experimental; may be removed or relocated
--export([start/1, stop/1, test/3, list/1, submit/1, submit/2, submit/3,
-	 watch/1, watch/2, watch/3, watch_path/1, watch_path/2,
-	 watch_path/3, watch_regexp/1, watch_regexp/2, watch_regexp/3,
-	 watch_app/1, watch_app/2, watch_app/3]).
+-export([start/1, stop/1, test/3, submit/1, submit/2, submit/3, watch/1,
+	 watch/2, watch/3, watch_path/1, watch_path/2, watch_path/3,
+	 watch_regexp/1, watch_regexp/2, watch_regexp/3, watch_app/1,
+	 watch_app/2, watch_app/3]).
 
 %% EUnit entry points
 
@@ -110,13 +110,6 @@ watch_app(Server, Name, Options) ->
 	    watch_path(Server, filename:join(Path, "ebin"), Options);
 	_ ->
 	    error
-    end.
-
-%% @private
-list(T) ->
-    try eunit_data:list(T)
-    catch
-	{error, R} -> {error, R}
     end.
 
 %% @equiv test(Tests, [])

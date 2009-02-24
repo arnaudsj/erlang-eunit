@@ -28,8 +28,8 @@
 
 -include_lib("kernel/include/file.hrl").
 
--export([list/1, iter_init/2, iter_next/2, iter_prev/2, iter_id/1, 
-	 list_size/1, enter_context/3]).
+-export([iter_init/2, iter_next/2, iter_prev/2, iter_id/1,
+	 enter_context/3]).
 
 -import(lists, [foldr/3]).
 
@@ -675,70 +675,6 @@ enter_context(#context{setup = S, cleanup = C, process = P}, I, F) ->
 	 end,
     eunit_test:enter_context(S, C, I, F1).
 
-
-%% ---------------------------------------------------------------------
-%% Returns a symbolic listing of a set of tests
-%%
-%% @type testInfoList() = [Entry]
-%%   Entry = {item, testId(), Description, testLoc()}
-%%         | {group, testId(), Description, testInfoList}
-%%   Description = string()
-%% @type testId() = [integer()]
-%% @type testLoc() = {{moduleName(),functionName(),arity()}, lineNumber()}
-%% @type lineNumber() = integer().  Proper line numbers are always >= 1.
-%%
-%% @throws {bad_test, term()}
-%%       | {generator_failed, exception()}
-%%       | {no_such_function, eunit_lib:mfa()}
-%%       | {module_not_found, moduleName()}
-%%       | {application_not_found, appName()}
-%%       | {file_read_error, {Reason::atom(), Message::string(),
-%%                            fileName()}}
-%%       | {context_error, instantiation_failed, eunit_lib:exception()}
-
-list(T) ->
-    list(T, []).
-
-list(T, ParentID) ->
-    list_loop(iter_init(T, ParentID)).
-
-list_loop(I) ->
-    case iter_next(I, fun (R) -> throw({error, R}) end) of
- 	{T, I1} ->
-	    Id = iter_id(I1),
- 	    case T of
-		#test{} ->
-		    Loc = {T#test.location, T#test.line},
-		    [{item, Id, desc_string(T#test.desc), Loc}
-		     | list_loop(I1)];
-		#group{context = Context} ->
-		    [{group, Id, desc_string(T#group.desc),
-		      list_context(Context, T#group.tests, Id)}
-		     | list_loop(I1)]
-	    end;
- 	none ->
- 	    []
-    end.
-
-desc_string(undefined) -> "";
-desc_string(S) -> S.
-
-list_context(undefined, T, ParentId) ->
-    list(T, ParentId);
-list_context(#context{process = local}, T, ParentId) ->
-    browse_context(T, fun (T) -> list(T, ParentId) end);
-list_context(#context{process = spawn}, T, ParentId) ->
-    browse_context(T, fun (T) -> list({spawn, T}, ParentId) end);
-list_context(#context{process = {spawn, N}}, T, ParentId) ->
-    browse_context(T, fun (T) -> list({spawn, N, T}, ParentId) end).
-
-browse_context(T, F) ->
-    eunit_test:browse_context(T, F).
-
-list_size({item, _, _, _}) -> 1;
-list_size({group, _, _, Es}) -> list_size(Es);    
-list_size(Es) when is_list(Es) ->
-    lists:foldl(fun (E, N) -> N + list_size(E) end, 0, Es).
 
 -ifdef(TEST).
 generator_exported_() ->

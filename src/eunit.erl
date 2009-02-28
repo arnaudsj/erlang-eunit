@@ -182,14 +182,15 @@ submit(Server, T, Options) ->
     eunit_server:start_test(Server, Dummy, T, Options).
 
 listeners(Options) ->
+    Ls = proplists:get_all_values(listen, Options),
     case proplists:get_value(event_log, Options) of
 	undefined ->
-	    [];
+	    Ls;
 	X ->
 	    LogFile = if is_list(X) -> X;
 			 true -> "eunit-events.log"
 		      end,
-	    [spawn(fun () -> event_logger(LogFile) end)]
+	    [spawn_link(fun () -> event_logger(LogFile) end) | Ls]
     end.
 
 %% TODO: make this report file errors

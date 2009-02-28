@@ -14,14 +14,15 @@ SOURCES= \
 	eunit_autoexport.erl \
 	eunit_striptests.erl \
 	eunit.erl \
-	eunit_tests.erl \
-	eunit_server.erl \
-	eunit_proc.erl \
 	eunit_serial.erl \
+	eunit_listener.erl \
+	eunit_proc.erl \
 	eunit_test.erl \
 	eunit_lib.erl \
 	eunit_data.erl \
+	eunit_server.erl \
 	eunit_tty.erl \
+	eunit_tests.erl \
 	code_monitor.erl \
 	file_monitor.erl \
 	file_monitor_tests.erl \

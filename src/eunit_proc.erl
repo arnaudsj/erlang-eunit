@@ -237,9 +237,15 @@ insulator_wait(Child, Parent, Buf, St) ->
 	    exit_messages(Id, {abort, Cause}, St),
 	    %% no need to wait for the {'EXIT',Child,_} message
 	    terminate_insulator(St);
-	{io_request, From, ReplyAs, Req} when is_pid(From) ->
-	    Buf1 = io_request(From, ReplyAs, Req, hd(Buf)),
+	{io_request, Child, ReplyAs, Req} ->
+	    %% we only collect output from the child process itself, not
+	    %% from secondary processes; otherwise we get race problems
+	    Buf1 = io_request(Child, ReplyAs, Req, hd(Buf)),
 	    insulator_wait(Child, Parent, [Buf1 | tl(Buf)], St);
+	{io_request, From, ReplyAs, Req} when is_pid(From) ->
+	    %% just ensure the sender gets a reply; ignore the data
+	    io_request(From, ReplyAs, Req, []),
+	    insulator_wait(Child, Parent, Buf, St);
 	{timeout, Child, Id} ->
 	    exit_messages(Id, timeout, St),
 	    kill_task(Child, St);

@@ -391,11 +391,16 @@ parse({with, X, As}=T) when is_list(As) ->
 parse({S, T1} = T) when is_list(S) ->
     case eunit_lib:is_string(S) of
 	true ->
-	    group(#group{tests = T1, desc = S});
+	    group(#group{tests = T1, desc = list_to_binary(S)});
 	false ->
 	    bad_test(T)
     end;
+parse({S, T1}) when is_binary(S) ->
+    group(#group{tests = T1, desc = S});
 parse(T) when is_tuple(T), size(T) > 2, is_list(element(1, T)) ->
+    [S | Es] = tuple_to_list(T),
+    parse({S, list_to_tuple(Es)});
+parse(T) when is_tuple(T), size(T) > 2, is_binary(element(1, T)) ->
     [S | Es] = tuple_to_list(T),
     parse({S, list_to_tuple(Es)});
 parse(M) when is_atom(M) ->

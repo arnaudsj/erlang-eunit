@@ -130,9 +130,12 @@ test(Tests) ->
 %% <dt>`verbose'</dt>
 %% <dd>Displays more details about the running tests.</dd>
 %% </dl>
+%%
+%% Options in the environment variable EUNIT are also included last in
+%% the option list, i.e., have lower precedence than those in `Options'.
 %% @see test/1
 test(Tests, Options) ->
-    test(?SERVER, Tests, Options).
+    test(?SERVER, Tests, all_options(Options)).
 
 %% @private
 %% @doc See {@link test/2}.
@@ -220,3 +223,18 @@ event_logger_loop(Reference, FD) ->
 
 devnull() ->
     receive _ -> devnull() end.
+
+%% including options from EUNIT environment variable
+
+all_options(Opts) ->
+    try os:getenv("EUNIT") of
+	false -> Opts;
+	S ->
+	    {ok, Ts, _} = erl_scan:string(S),
+	    {ok, V} = erl_parse:parse_term(Ts ++ [{dot,1}]),
+	    if is_list(V) -> Opts ++ V;
+	       true -> Opts ++ [V]
+	    end
+    catch
+	_:_ -> Opts
+    end.

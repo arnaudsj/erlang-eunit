@@ -57,8 +57,11 @@ start(Tests, Order, Super, Reference)
 %% where Id identifies the item that the message pertains to, and the
 %% Info part can be one of:
 %%
-%%   {progress, 'begin', {test | group, Info}}
-%%       indicates that the item has been entered, and what type it is
+%%   {progress, 'begin', {test | group, Data}}
+%%       indicates that the item has been entered, and what type it is;
+%%       Data is {Description, Location, Line} for a test, and
+%%       {Description, [{spawn,SpawnType},{order,OrderType}]} for a
+%%       group.
 %%
 %%   {progress, 'end', {Status, Time::integer(), Output::binary()}}
 %%       Status = 'ok' | {error, Exception} | {skipped, Cause} | integer()
@@ -68,13 +71,14 @@ start(Tests, Order, Super, Reference)
 %%       Status is {skipped, Cause}, then Cause is a term thrown from
 %%       eunit_test:run_testfun/1. For a group item, the Status field is
 %%       the number of immediate subitems of the group; this helps the
-%%       collation of results.
+%%       collation of results. Failure for groups is always signalled
+%%       through a cancel message, not through the Status field.
 %%
 %%   {cancel, Descriptor}
 %%       where Descriptor can be:
 %%           timeout            a timeout occurred
 %%           {blame, Id}        forced to terminate because of item `Id'
-%%           {abort, Cause}     the test failed to execute
+%%           {abort, Cause}     the test or group failed to execute
 %%           {exit, Reason}     the test process terminated unexpectedly
 %%           {startup, Reason}  failed to start a remote test process
 %%
@@ -221,15 +225,16 @@ insulator_process(Type, Fun, St0) ->
 
 insulator_wait(Child, Parent, Buf, St) ->
     receive
-	{child, Child, Id, {progress, {'begin', Data}}} ->
+	{child, Child, Id, {'begin', Data}} ->
 	    message_super(Id, {progress, 'begin', Data}, St),
 	    insulator_wait(Child, Parent, [[] | Buf], St);
-	{child, Child, Id, {progress, {'end', {Status, Time}}}} ->
+	{child, Child, Id, {'end', {Status, Time}}} ->
 	    Msg = {Status, Time, list_to_binary(lists:reverse(hd(Buf)))},
 	    message_super(Id, {progress, 'end', Msg}, St),
 	    insulator_wait(Child, Parent, tl(Buf), St);
-	{child, Child, Id, {cancel, Reason}} ->
-	    message_super(Id, {cancel, Reason}, St),
+	{child, Child, Id, {skipped, Reason}} ->
+	    %% this happens when a subgroup fails to enter the context
+	    message_super(Id, {cancel, {abort, Reason}}, St),
 	    insulator_wait(Child, Parent, Buf, St);
 	{child, Child, Id, {abort, Cause}} ->
 	    %% this happens when the child code threw an internal
@@ -286,8 +291,8 @@ exit_messages(Id, Cause, St) ->
 %% Child processes send all messages via the insulator to ensure proper
 %% sequencing with timeouts and exit signals.
 
-message_insulator(Type, Data, St) ->
-    St#procstate.insulator ! {child, self(), St#procstate.id, {Type, Data}}.
+message_insulator(Data, St) ->
+    St#procstate.insulator ! {child, self(), St#procstate.id, Data}.
 
 %% Timeout handling
 
@@ -330,12 +335,6 @@ with_timeout(Time, F, St) when is_integer(Time) ->
 %% the test code is allowed to enable signal trapping as it pleases.
 %% Note that I/O is redirected to the insulator process.
 
-%% The fun executed by the child process is passed from start_task, and
-%% runs either handle_item or run_group, and run_group catches all its
-%% throws, so any eunit_abort here can only be from handle_item, i.e.
-%% from handle_test or handle_group, and handle_test never throws, so it
-%% seems it can only come from run_group - which catches all throws...
-
 %% @spec (() -> term(), #procstate{}) -> ok
 
 child_process(Fun, St) ->
@@ -348,7 +347,7 @@ child_process(Fun, St) ->
 	%% an {eunit_abort, Reason} exception; any other exception will
 	%% be reported as an unexpected termination of the test
 	{eunit_abort, Cause} ->
-	    message_insulator(abort, Cause, St),
+	    message_insulator({abort, Cause}, St),
 	    exit(aborted)
     end.
 
@@ -359,7 +358,7 @@ child_test_() ->
 -endif.
 
 %% @throws abortException()
-%% @type abortException() = {abort, Cause::term()}
+%% @type abortException() = {eunit_abort, Cause::term()}
 
 abort_task(Cause) ->
     throw({eunit_abort, Cause}).
@@ -453,7 +452,10 @@ spawn_item(T, St0) ->
     start_task(local, Fun, St0).
 
 get_next_item(I) ->
-    eunit_data:iter_next(I, fun abort_task/1).
+    try eunit_data:iter_next(I)
+    catch
+	Term -> abort_task(Term)
+    end.
 
 handle_item(T, St) ->
     case T of
@@ -463,10 +465,10 @@ handle_item(T, St) ->
 
 handle_test(T, St) ->
     Info = {T#test.desc, T#test.location, T#test.line},
-    message_insulator(progress, {'begin', {test, Info}}, St),
+    message_insulator({'begin', {test, Info}}, St),
     {Status, Time} = with_timeout(T#test.timeout, ?DEFAULT_TEST_TIMEOUT,
 				  fun () -> run_test(T) end, St),
-    message_insulator(progress, {'end', {Status, Time}}, St),
+    message_insulator({'end', {Status, Time}}, St),
     ok.
 
 %% @spec (#test{}) -> ok | {error, eunit_lib:exception()}
@@ -475,7 +477,7 @@ handle_test(T, St) ->
 run_test(#test{f = F}) ->
     try eunit_test:run_testfun(F) of
 	{ok, _Value} ->
-	    %% just throw away the return value
+	    %% just discard the return value
 	    ok;
 	{error, Exception} ->
 	    {error, Exception}
@@ -504,22 +506,22 @@ spawn_group(Type, T, St0) ->
 	  end,
     start_task(Type, Fun, St0).
 
-%% note that this catches all throws
 run_group(T, St) ->
     %% note that the setup/cleanup is outside the group timeout; if the
     %% setup fails, we do not start any timers
     Timeout = T#group.timeout,
     Info = {T#group.desc, [{spawn,T#group.spawn},{order,T#group.order}]},
-    message_insulator(progress, {'begin', {group, Info}}, St),
+    message_insulator({'begin', {group, Info}}, St),
     F = fun (G) -> enter_group(G, Timeout, St) end,
     try with_context(T, F) of
 	{Status, Time} ->
-	    message_insulator(progress, {'end', {Status, Time}}, St)
+	    message_insulator({'end', {Status, Time}}, St)
     catch
-	throw:Cause ->
-	    %% the throw can come from eunit_data:enter_context/4 or
-	    %% from eunit_data:iter_next/2
-	    message_insulator(cancel, {abort, Cause}, St)
+	%% a throw here can come from eunit_data:enter_context/4 or from
+	%% get_next_item/1; for context errors, report group as aborted,
+	%% but continue processing tests
+	{enter_context, Cause} ->
+	    message_insulator({skipped, Cause}, St)
     end,
     ok.
 
@@ -530,7 +532,10 @@ enter_group(T, Timeout, St) ->
 with_context(#group{context = undefined, tests = T}, F) ->
     F(T);
 with_context(#group{context = #context{} = C, tests = I}, F) ->
-    eunit_data:enter_context(C, I, F).
+    try eunit_data:enter_context(C, I, F)
+    catch
+	Term -> throw({enter_context, Term})
+    end.
 
 %% Implementation of buffering I/O for the insulator process. (Note that
 %% each batch of characters is just pushed on the buffer, so it needs to

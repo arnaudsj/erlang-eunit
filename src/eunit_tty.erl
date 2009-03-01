@@ -55,29 +55,29 @@ init(Options) ->
     end.
 
 terminate({ok, Data}, St) ->
-    Success = proplists:get_value(success, Data, 0),
-    Error = proplists:get_value(fail, Data, 0),
-    Skipped = proplists:get_value(skipped, Data, 0),
-    Cancel = proplists:get_value(cancel, Data, false),
-    if Error =:= 0, Skipped =:= 0, Cancel =:= false ->
-	    if Success =:= 0 ->
+    Pass = proplists:get_value(pass, Data, 0),
+    Fail = proplists:get_value(fail, Data, 0),
+    Skip = proplists:get_value(skip, Data, 0),
+    Cancel = proplists:get_value(cancel, Data, 0),
+    if Fail =:= 0, Skip =:= 0, Cancel =:= 0 ->
+	    if Pass =:= 0 ->
 		    io:fwrite("  There were no tests to run.\n");
 	       true ->
 		    if St#state.verbose -> print_bar();
 		       true -> ok
 		    end,
-		    if Success =:= 1 ->
-			    io:fwrite("  Test successful.\n");
+		    if Pass =:= 1 ->
+			    io:fwrite("  Test passed.\n");
 		       true ->
-			    io:fwrite("  All ~w tests successful.\n", [Success])
+			    io:fwrite("  All ~w tests passed.\n", [Pass])
 		    end
 	    end,
 	    sync_end(ok);
        true ->
 	    print_bar(),
-	    io:fwrite("  Failed: ~w.  Skipped: ~w.  Succeeded: ~w.\n",
-		      [Error, Skipped, Success]),
-	    if Cancel =:= true ->
+	    io:fwrite("  Failed: ~w.  Skipped: ~w.  Passed: ~w.\n",
+		      [Fail, Skip, Pass]),
+	    if Cancel =/= 0 ->
 		    io:fwrite("One or more tests were cancelled.\n");
 	       true -> ok
 	    end,

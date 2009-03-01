@@ -40,10 +40,10 @@ behaviour_info(_Other) ->
 
 
 -record(state, {callback,    % callback module
-		success = 0,
+		pass = 0,
 		fail = 0,
-		skipped = 0,
-		cancel = false,
+		skip = 0,
+		cancel = 0,
 		state        % substate
 	       }).
 
@@ -58,9 +58,9 @@ start(Callback, Options) ->
 init(St0, Options) ->
     St1 = call(init, [Options], St0),
     St2 = expect([], undefined, St1),
-    Data = [{success, St2#state.success},
+    Data = [{pass, St2#state.pass},
 	    {fail, St2#state.fail},
-	    {skipped, St2#state.skipped},
+	    {skip, St2#state.skip},
 	    {cancel, St2#state.cancel}],
     call(terminate, [{ok, Data}, St2#state.state], St2),
     exit(normal).
@@ -162,8 +162,8 @@ handle_end(test, Id, {Desc, Loc, Line}, {Status, Time, Output}, St) ->
 	    {time, Time}, {status, Status}, {output, Output}],
     ?debugFmt("handle_end test ~w ~w", [Id, Data]),
     St1 = case Status of
-	      ok -> St#state{success = St#state.success + 1};
-	      {skipped,_} -> St#state{skipped = St#state.skipped + 1};
+	      ok -> St#state{pass = St#state.pass + 1};
+	      {skipped,_} -> St#state{skip = St#state.skip + 1};
 	      {error,_} -> St#state{fail = St#state.fail + 1}
 	  end,
     call(handle_end, [test, Data, St#state.state], St1).
@@ -172,10 +172,10 @@ handle_cancel(group, Id, {Desc, Extra}, Reason, St) ->
     Data = [{id, Id}, {desc, Desc}, {reason, Reason} | Extra],
     ?debugFmt("handle_cancel group ~w ~w", [Id, Data]),
     call(handle_cancel, [group, Data, St#state.state],
-	 St#state{cancel = true});
+	 St#state{cancel = St#state.cancel + 1});
 handle_cancel(test, Id, {Desc, Loc, Line}, Reason, St) ->
     Data = [{id, Id}, {desc, Desc}, {source, Loc}, {line, Line},
 	    {reason, Reason}],
     ?debugFmt("handle_cancel test ~w ~w", [Id, Data]),
     call(handle_cancel, [test, Data, St#state.state],
-	 St#state{cancel = true}).
+	 St#state{cancel = St#state.cancel + 1}).

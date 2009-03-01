@@ -28,8 +28,8 @@
 
 -include_lib("kernel/include/file.hrl").
 
--export([iter_init/2, iter_next/2, iter_prev/2, iter_id/1,
-	 enter_context/3]).
+-export([iter_init/2, iter_next/1, iter_prev/1, iter_id/1,
+	 enter_context/3, get_module_tests/1]).
 
 -import(lists, [foldr/3]).
 
@@ -122,17 +122,7 @@ iter_init(Tests, ParentID) ->
 iter_id(#iter{pos = N, parent = Ns}) ->
     lists:reverse(Ns, [N]).
 
-%% @spec (testIterator(), Handler) -> none | {testItem(), testIterator()}
-%%    Handler = (term()) -> term()
-
-iter_next(I, H) ->
-    iter_do(fun iter_next/1, I, H).
-
-iter_do(F, I, H) ->
-    try F(I)
-    catch
-	throw:R -> H(R)
-    end.
+%% @spec (testIterator()) -> none | {testItem(), testIterator()}
 
 iter_next(I = #iter{next = []}) ->
     case next(I#iter.tests) of
@@ -148,11 +138,7 @@ iter_next(I = #iter{next = [T | Ts]}) ->
 	       prev = [T | I#iter.prev],
 	       pos = I#iter.pos + 1}}.
 
-%% @spec (testIterator(), Handler) -> none | {testItem(), testIterator()}
-%%    Handler = (term()) -> term()
-
-iter_prev(I, H) ->
-    iter_do(fun iter_prev/1, I, H).
+%% @spec (testIterator()) -> none | {testItem(), testIterator()}
 
 iter_prev(#iter{prev = []}) ->
     none;

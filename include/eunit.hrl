@@ -101,6 +101,21 @@
 -define(IF(B,T,F), (case (B) of true->(T); false->(F) end)).
 -endif.
 
+%% This macro yields 'true' if the value of E matches the guarded
+%% pattern G, otherwise 'false'.
+-ifndef(MATCHES).
+-define(MATCHES(G,E), (case (E) of G -> true; _ -> false end)).
+-endif.
+
+%% This macro can be used at any time to check whether or not the code
+%% is currently running directly under eunit. Note that it does not work
+%% in secondary processes if they have been assigned a new group leader.
+-ifndef(UNDER_EUNIT).
+-define(UNDER_EUNIT,
+	(?MATCHES({current_function,{eunit_proc,_,_}},
+		  erlang:process_info(group_leader(), current_function)))).
+-endif.
+
 -ifdef(NOASSERT).
 %% The plain assert macro should be defined to do nothing if this file
 %% is included when debugging/testing is turned off.

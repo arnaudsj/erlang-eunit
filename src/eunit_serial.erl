@@ -149,10 +149,10 @@ wait(Id, Type, ParentId, GroupMinSize, St) ->
 %% the event has not yet arrived or been cancelled - wait for more info
 wait_1(Id, Type, ParentId, GroupMinSize, St) ->
     receive
-	{status, Id, {progress, Type, _Data}}=Msg ->
+	{status, Id, {progress, Type, _}}=Msg ->
 	    %%?debugVal({Type, ParentId, Id}),
 	    {ok, Msg, St};
-	{status,ParentId,{progress,'end',{GroupMinSize,_,_}}}=Msg ->
+	{status, ParentId, {progress, 'end', {GroupMinSize, _}}}=Msg ->
 	    %% the parent group ended (the final status of a group is
 	    %% the count of its subitems), and we have seen all of its
 	    %% subtests, so the currently expected event does not exist

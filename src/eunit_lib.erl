@@ -153,13 +153,13 @@ format_error({application_not_found, A}) when is_atom(A) ->
     error_msg("application not found", "~w", [A]);
 format_error({file_read_error, {_R, Msg, F}}) ->
     error_msg("error reading file", "~s: ~s", [Msg, F]);
-format_error({context_error, setup_failed, Exception}) ->
+format_error({setup_failed, Exception}) ->
     error_msg("context setup failed", "~s",
 	      [format_exception(Exception)]);
-format_error({context_error, cleanup_failed, Exception}) ->
+format_error({cleanup_failed, Exception}) ->
     error_msg("context cleanup failed", "~s",
 	      [format_exception(Exception)]);
-format_error({context_error, instantiation_failed, Exception}) ->
+format_error({instantiation_failed, Exception}) ->
     error_msg("instantiation of subtests failed", "~s",
 	      [format_exception(Exception)]).
 

@@ -143,24 +143,22 @@ call(F, As, St) when is_atom(F) ->
 	    erlang:raise(Class, Term, Trace)
     end.
 
-handle_begin(group, Id, {Desc, Extra}, St) ->
-    Data = [{id, Id}, {desc, Desc} | Extra],
-    ?debugFmt("handle_begin group ~w ~w", [Id, Data]),
+handle_begin(group, Id, Data0, St) ->
+    Data = [{id, Id} | Data0],
+    ?debugFmt("handle_begin group ~w ~w", [Id, Data0]),
     call(handle_begin, [group, Data, St#state.state], St);
-handle_begin(test, Id, {Desc, Loc, Line}, St) ->
-    Data = [{id, Id}, {desc, Desc}, {source, Loc}, {line, Line}],
-    ?debugFmt("handle_begin test ~w ~w", [Id, Data]),
+handle_begin(test, Id, Data0, St) ->
+    Data = [{id, Id} | Data0],
+    ?debugFmt("handle_begin test ~w ~w", [Id, Data0]),
     call(handle_begin, [test, Data, St#state.state], St).
 
-handle_end(group, Id, {Desc, Extra}, {Count, Time, Output}, St) ->
-    Data = [{id, Id}, {desc, Desc}, {size, Count}, {time, Time}, {output, Output}
-	    | Extra],
-    ?debugFmt("handle_end group ~w ~w", [Id, Data]),
+handle_end(group, Id, Data0, {Count, Data1}, St) ->
+    Data = [{id, Id}, {size, Count} | Data0 ++ Data1],
+    ?debugFmt("handle_end group ~w ~w", [Id, {Count, Data1}]),
     call(handle_end, [group, Data, St#state.state], St);
-handle_end(test, Id, {Desc, Loc, Line}, {Status, Time, Output}, St) ->
-    Data = [{id, Id}, {desc, Desc}, {source, Loc}, {line, Line},
-	    {time, Time}, {status, Status}, {output, Output}],
-    ?debugFmt("handle_end test ~w ~w", [Id, Data]),
+handle_end(test, Id, Data0, {Status, Data1}, St) ->
+    Data = [{id, Id}, {status, Status} | Data0 ++ Data1],
+    ?debugFmt("handle_end test ~w ~w", [Id, {Status, Data1}]),
     St1 = case Status of
 	      ok -> St#state{pass = St#state.pass + 1};
 	      {skipped,_} -> St#state{skip = St#state.skip + 1};
@@ -168,14 +166,13 @@ handle_end(test, Id, {Desc, Loc, Line}, {Status, Time, Output}, St) ->
 	  end,
     call(handle_end, [test, Data, St#state.state], St1).
 
-handle_cancel(group, Id, {Desc, Extra}, Reason, St) ->
-    Data = [{id, Id}, {desc, Desc}, {reason, Reason} | Extra],
-    ?debugFmt("handle_cancel group ~w ~w", [Id, Data]),
+handle_cancel(group, Id, Data0, Reason, St) ->
+    Data = [{id, Id}, {reason, Reason} | Data0],
+    ?debugFmt("handle_cancel group ~w ~w", [Id, Reason]),
     call(handle_cancel, [group, Data, St#state.state],
 	 St#state{cancel = St#state.cancel + 1});
-handle_cancel(test, Id, {Desc, Loc, Line}, Reason, St) ->
-    Data = [{id, Id}, {desc, Desc}, {source, Loc}, {line, Line},
-	    {reason, Reason}],
-    ?debugFmt("handle_cancel test ~w ~w", [Id, Data]),
+handle_cancel(test, Id, Data0, Reason, St) ->
+    Data = [{id, Id}, {reason, Reason} | Data0],
+    ?debugFmt("handle_cancel test ~w ~w", [Id, Reason]),
     call(handle_cancel, [test, Data, St#state.state],
 	 St#state{cancel = St#state.cancel + 1}).

@@ -59,12 +59,13 @@ start(Tests, Order, Super, Reference)
 %%
 %%   {progress, 'begin', {test | group, Data}}
 %%       indicates that the item has been entered, and what type it is;
-%%       Data is {Description, Location, Line} for a test, and
-%%       {Description, [{spawn,SpawnType},{order,OrderType}]} for a
-%%       group.
+%%       Data is [{desc,binary()}, {source,Source}, {line,integer()}] for
+%%       a test, and [{desc,binary()}, {spawn,SpawnType},
+%%       {order,OrderType}] for a group.
 %%
-%%   {progress, 'end', {Status, Time::integer(), Output::binary()}}
+%%   {progress, 'end', {Status, Data}}
 %%       Status = 'ok' | {error, Exception} | {skipped, Cause} | integer()
+%%       Data = [{time,integer()}, {output,binary()}]
 %%
 %%       where Time is measured in milliseconds and Output is the data
 %%       written to the standard output stream during the test; if
@@ -225,12 +226,13 @@ insulator_process(Type, Fun, St0) ->
 
 insulator_wait(Child, Parent, Buf, St) ->
     receive
-	{child, Child, Id, {'begin', Data}} ->
-	    message_super(Id, {progress, 'begin', Data}, St),
+	{child, Child, Id, {'begin', Type, Data}} ->
+	    message_super(Id, {progress, 'begin', {Type, Data}}, St),
 	    insulator_wait(Child, Parent, [[] | Buf], St);
-	{child, Child, Id, {'end', {Status, Time}}} ->
-	    Msg = {Status, Time, list_to_binary(lists:reverse(hd(Buf)))},
-	    message_super(Id, {progress, 'end', Msg}, St),
+	{child, Child, Id, {'end', Status, Time}} ->
+	    Data = [{time, Time},
+		    {output, list_to_binary(lists:reverse(hd(Buf)))}],
+	    message_super(Id, {progress, 'end', {Status, Data}}, St),
 	    insulator_wait(Child, Parent, tl(Buf), St);
 	{child, Child, Id, {skipped, Reason}} ->
 	    %% this happens when a subgroup fails to enter the context
@@ -464,11 +466,12 @@ handle_item(T, St) ->
     end.
 
 handle_test(T, St) ->
-    Info = {T#test.desc, T#test.location, T#test.line},
-    message_insulator({'begin', {test, Info}}, St),
+    Data = [{desc, T#test.desc}, {source, T#test.location},
+	    {line, T#test.line}],
+    message_insulator({'begin', test, Data}, St),
     {Status, Time} = with_timeout(T#test.timeout, ?DEFAULT_TEST_TIMEOUT,
 				  fun () -> run_test(T) end, St),
-    message_insulator({'end', {Status, Time}}, St),
+    message_insulator({'end', Status, Time}, St),
     ok.
 
 %% @spec (#test{}) -> ok | {error, eunit_lib:exception()}
@@ -510,18 +513,19 @@ run_group(T, St) ->
     %% note that the setup/cleanup is outside the group timeout; if the
     %% setup fails, we do not start any timers
     Timeout = T#group.timeout,
-    Info = {T#group.desc, [{spawn,T#group.spawn},{order,T#group.order}]},
-    message_insulator({'begin', {group, Info}}, St),
+    Data = [{desc, T#group.desc}, {spawn, T#group.spawn},
+	    {order, T#group.order}],
+    message_insulator({'begin', group, Data}, St),
     F = fun (G) -> enter_group(G, Timeout, St) end,
     try with_context(T, F) of
 	{Status, Time} ->
-	    message_insulator({'end', {Status, Time}}, St)
+	    message_insulator({'end', Status, Time}, St)
     catch
 	%% a throw here can come from eunit_data:enter_context/4 or from
 	%% get_next_item/1; for context errors, report group as aborted,
 	%% but continue processing tests
-	{enter_context, Cause} ->
-	    message_insulator({skipped, Cause}, St)
+	{context_error, Why, Trace} ->
+	    message_insulator({skipped, {Why, Trace}}, St)
     end,
     ok.
 
@@ -532,10 +536,7 @@ enter_group(T, Timeout, St) ->
 with_context(#group{context = undefined, tests = T}, F) ->
     F(T);
 with_context(#group{context = #context{} = C, tests = I}, F) ->
-    try eunit_data:enter_context(C, I, F)
-    catch
-	Term -> throw({enter_context, Term})
-    end.
+    eunit_data:enter_context(C, I, F).
 
 %% Implementation of buffering I/O for the insulator process. (Note that
 %% each batch of characters is just pushed on the buffer, so it needs to

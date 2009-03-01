@@ -113,7 +113,8 @@
 -ifndef(UNDER_EUNIT).
 -define(UNDER_EUNIT,
 	(?MATCHES({current_function,{eunit_proc,_,_}},
-		  erlang:process_info(group_leader(), current_function)))).
+		  .erlang:process_info(.erlang:group_leader(),
+				       current_function)))).
 -endif.
 
 -ifdef(NOASSERT).
@@ -215,7 +216,8 @@
 				     "{ "++(??Class)++" , "++(??Term)
 				     ++" , [...] }"},
 				    {unexpected_exception,
-				     {__C, __T, erlang:get_stacktrace()}}]})
+				     {__C, __T,
+				      .erlang:get_stacktrace()}}]})
 	    end
 	  end)())).
 -endif.
@@ -304,12 +306,11 @@
 -else.
 -define(debugMsg(S),
 	(begin
-	     io:fwrite(user, <<"~s:~w: ~s\n">>,
-		       [?FILE, ?LINE, S]),
+	     .io:fwrite(user, <<"~s:~w: ~s\n">>, [?FILE, ?LINE, S]),
 	     ok
 	 end)).
 -define(debugHere, (?debugMsg("<-"))).
--define(debugFmt(S, As), (?debugMsg(io_lib:format((S), (As))))).
+-define(debugFmt(S, As), (?debugMsg(.io_lib:format((S), (As))))).
 -define(debugVal(E),
 	((fun (__V) ->
 		  ?debugFmt(<<"~s = ~P">>, [(??E), __V, 15]),

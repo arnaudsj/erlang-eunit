@@ -1,4 +1,4 @@
-%%%-------------------------------------------------------------------
+%% -------------------------------------------------------------------
 %% File: eunit_internal.hrl
 %%
 %% $Id$ 
@@ -15,6 +15,7 @@
 -define(DEFAULT_GROUP_TIMEOUT, infinity).
 -define(DEFAULT_TEST_TIMEOUT, 5000).
 -define(DEFAULT_SETUP_PROCESS, spawn).
+-define(DEFAULT_MODULE_WRAPPER_NAME, eunit_wrapper_).
 
 -ifdef(DEBUG).
 -define(debugmsg(S),io:fwrite("\n* ~s: ~s\n", [?MODULE,S])).

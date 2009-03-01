@@ -62,6 +62,8 @@ form({function, _L, Name, 0, _Cs}, S, TestSuffix, GeneratorSuffix,
 		    end
 	    end
     end;
+form({function, _L, ?DEFAULT_MODULE_WRAPPER_NAME, 1, _Cs}, S, _, _, _) ->
+    sets:add_element({?DEFAULT_MODULE_WRAPPER_NAME,1}, S);
 form(_, S, _, _, _) ->
     S.
 

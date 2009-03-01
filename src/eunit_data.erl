@@ -554,29 +554,36 @@ push_order(_, _, G) ->
 %% @throws {module_not_found, moduleName()}
 
 get_module_tests(M) ->
-    TestSuffix = ?DEFAULT_TEST_SUFFIX,
-    GeneratorSuffix = ?DEFAULT_GENERATOR_SUFFIX,
     try M:module_info(exports) of
 	Es ->
-	    Fs = testfuns(Es, M, TestSuffix, GeneratorSuffix),
-	    Name = atom_to_list(M),
-	    case lists:suffix(?DEFAULT_TESTMODULE_SUFFIX, Name) of
-		false ->
-		    Name1 = Name ++ ?DEFAULT_TESTMODULE_SUFFIX,
-		    M1 = list_to_atom(Name1),
-		    try get_module_tests(M1) of
-			Fs1 ->
-			    Fs ++ [{"module '" ++ Name1 ++ "'", Fs1}]
-		    catch
-			{module_not_found, M1} ->
-			    Fs
-		    end;
-		true ->
-		    Fs
+	    Fs = get_module_tests_1(M, Es),
+	    W = ?DEFAULT_MODULE_WRAPPER_NAME,
+	    case lists:member({W,1}, Es) of
+		false -> Fs;
+		true -> {generator, fun () -> M:W(Fs) end}
 	    end
     catch
 	error:undef -> 
 	    throw({module_not_found, M})
+    end.
+
+get_module_tests_1(M, Es) ->
+    Fs = testfuns(Es, M, ?DEFAULT_TEST_SUFFIX,
+		  ?DEFAULT_GENERATOR_SUFFIX),
+    Name = atom_to_list(M),
+    case lists:suffix(?DEFAULT_TESTMODULE_SUFFIX, Name) of
+	false ->
+	    Name1 = Name ++ ?DEFAULT_TESTMODULE_SUFFIX,
+	    M1 = list_to_atom(Name1),
+	    try get_module_tests(M1) of
+		Fs1 ->
+		    Fs ++ [{"module '" ++ Name1 ++ "'", Fs1}]
+	    catch
+		{module_not_found, M1} ->
+		    Fs
+	    end;
+	true ->
+	    Fs
     end.
 
 testfuns(Es, M, TestSuffix, GeneratorSuffix) ->

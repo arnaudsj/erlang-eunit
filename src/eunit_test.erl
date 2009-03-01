@@ -24,7 +24,7 @@
 -module(eunit_test).
 
 -export([run_testfun/1, function_wrapper/2, enter_context/4,
-	 browse_context/2, multi_setup/1]).
+	 multi_setup/1]).
 
 
 -include("eunit.hrl").
@@ -278,24 +278,6 @@ enter_context(Setup, Cleanup, Instantiate, Callback) ->
 context_error(Type, Class, Term) ->
     throw({context_error, Type, {Class, Term, get_stacktrace()}}).
 
-%% Instantiates a context with dummy values to make browsing possible
-%% @throws {context_error, instantiation_failed, eunit_lib:exception()}
-
-browse_context(I, F) ->
-    %% Browse: dummy setup/cleanup and a wrapper for the instantiator
-    I1 = fun (_) ->
-		try eunit_lib:browse_fun(I) of
-		    {_, T} -> T
-		catch
-		    Class:Term ->
-			context_error(instantiation_failed, Class, Term)
-		end
-	 end,
-    enter_context(fun ok/0, fun ok/1, I1, F).
-
-ok() -> ok.
-ok(_) -> ok.
-
 %% This generates single setup/cleanup functions from a list of tuples
 %% on the form {Tag, Setup, Cleanup}, where the setup function always
 %% backs out correctly from partial completion.
@@ -332,3 +314,5 @@ multi_setup([{Tag, S} | Es], CleanupPrev) ->
     multi_setup([{Tag, S, fun ok/1} | Es], CleanupPrev);
 multi_setup([], CleanupAll) ->
     {fun (Rs) -> Rs end, CleanupAll}.
+
+ok(_) -> ok.

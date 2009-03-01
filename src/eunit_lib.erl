@@ -30,10 +30,10 @@
 -include("eunit_internal.hrl").
 
 
--export([dlist_next/1, uniq/1, fun_parent/1, is_string/1, browse_fun/1,
-	 command/1, command/2, command/3, trie_new/0, trie_store/2,
-	 trie_match/2, split_node/1, consult_file/1, list_dir/1,
-	 format_exit_term/1, format_exception/1, format_error/1]).
+-export([dlist_next/1, uniq/1, fun_parent/1, is_string/1, command/1,
+	 command/2, command/3, trie_new/0, trie_store/2, trie_match/2,
+	 split_node/1, consult_file/1, list_dir/1, format_exit_term/1,
+	 format_exception/1, format_error/1]).
 
 
 %% Type definitions for describing exceptions
@@ -350,118 +350,6 @@ uniq_test_() ->
       ?_test(["1","2","3"] = uniq(["1","1","2","2","3","3"]))
      ]}.
 -endif.
-
-
-%% ---------------------------------------------------------------------
-%% Apply arbitrary unary function F with dummy arguments "until it
-%% works". (F must be side effect free! It will be called repeatedly.)
-%% No exceptions will be thrown unless the function actually crashes for
-%% some other reason than being unable to match the argument.
-
-%% @spec (F::(any()) -> any()) -> {Value::any(), Result::any()}
-
-browse_fun(F) ->
-    browse_fun(F, arg_values()).
-
-browse_fun(F, Next) ->
-    case Next() of
-	[V | Next1] ->
-	    case try_apply(F, V) of
-		{ok, Result} ->
-		    {V, Result};
-		{error, function_clause} ->
-		    browse_fun(F, Next1);
-		{error, badarity} ->
-		    erlang:error({badarity, {F, 1}});
-		{error, {Class, Reason, Trace}} ->
-		    erlang:raise(Class, Reason, Trace)
-	    end;
-	[] ->
-	    %% tried everything - this ought to provoke an error
-	    F(undefined)
-    end.
-
-%% Apply argument to function and report whether it succeeded (and with
-%% what return value), or failed due to bad arity or a simple top-level
-%% function_clause error, or if it crashed in some other way.
-
-%% @spec (F::(any()) -> any(), V::any()) -> 
-%%     {ok, Result::any()}
-%%   | {error, function_clause | badarity | eunit_test:exception()}
-
-try_apply(F, Arg) ->
-    case erlang:fun_info(F, arity) of
-	{arity, 1} ->
-	    {module, M} = erlang:fun_info(F, module),
-	    {name, N} = erlang:fun_info(F, name),
-	    try_apply(F, Arg, M, N);
-	_ ->
-	    {error, badarity}
-    end.
-
-try_apply(F, Arg, M, N) ->
-    try F(Arg) of
-	X -> {ok, X}
-    catch
-	error:function_clause ->
-	    case erlang:get_stacktrace() of
-		[{M, N, _Args} | _] ->
-		    {error, function_clause};
-		Trace ->
-		    {error, {error, function_clause, Trace}}
-	    end;
-	  Class:Reason ->
-	    {error, {Class, Reason, erlang:get_stacktrace()}}
-    end.
-
-%% test value producers for function browsing
-
-arg_values() ->
-    Vs = [undefined, ok, true, false, 0, 1],
-    fun () -> arg_values(Vs) end.
-
-arg_values([V | Vs]) ->
-    [V | fun () -> arg_values(Vs) end];
-arg_values(_) ->
-    (arg_tuples())().
-
-arg_tuples() ->
-    fun () -> arg_tuples(0) end.
-
-arg_tuples(N) when N >= 0, N =< 12 ->
-    [erlang:make_tuple(N, undefined) | fun () -> arg_tuples(N + 1) end];
-arg_tuples(_) ->
-    (arg_lists())().
-
-arg_lists() ->
-    fun () -> arg_lists(0) end.
-
-arg_lists(N) when N >= 0, N =< 12 ->
-    [lists:duplicate(N, undefined) | fun () -> arg_lists(N + 1) end];
-arg_lists(_) ->
-    [].
-
--ifdef(TEST).
-browse_fun_test_() ->
-    {"browsing funs",
-     [?_assertError({badarity, {_, 1}}, browse_fun(fun () -> ok end)),
-      ?_assertError({badarity, {_, 1}}, browse_fun(fun (_,_) -> ok end)),
-      ?_assertError(function_clause, browse_fun(fun (42) -> ok end)),
-      ?_test({_, 17} = browse_fun(fun (_) -> 17 end)),
-      ?_test({_, 17} = browse_fun(fun (undefined) -> 17 end)),
-      ?_test({_, 17} = browse_fun(fun (ok) -> 17 end)),
-      ?_test({_, 17} = browse_fun(fun (true) -> 17 end)),
-      ?_test({_, 17} = browse_fun(fun ({}) -> 17 end)),
-      ?_test({_, 17} = browse_fun(fun ({_}) -> 17 end)),
-      ?_test({_, 17} = browse_fun(fun ({_,_}) -> 17 end)),
-      ?_test({_, 17} = browse_fun(fun ({_,_,_}) -> 17 end)),
-      ?_test({_, 17} = browse_fun(fun ([]) -> 17 end)),
-      ?_test({_, 17} = browse_fun(fun ([_]) -> 17 end)),
-      ?_test({_, 17} = browse_fun(fun ([_,_]) -> 17 end)),
-      ?_test({_, 17} = browse_fun(fun ([_,_,_]) -> 17 end))
-     ]}.
--endif.
-
 
 %% ---------------------------------------------------------------------
 %% Replacement for os:cmd

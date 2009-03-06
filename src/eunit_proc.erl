@@ -28,6 +28,8 @@
 
 -export([start/4]).
 
+%% This must be exported; see new_group_leader/1 for details.
+-export([group_leader_process/1]).
 
 -record(procstate, {ref, id, super, insulator, parent, order}).
 
@@ -230,8 +232,7 @@ insulator_wait(Child, Parent, Buf, St) ->
 	    message_super(Id, {progress, 'begin', {Type, Data}}, St),
 	    insulator_wait(Child, Parent, [[] | Buf], St);
 	{child, Child, Id, {'end', Status, Time}} ->
-	    Data = [{time, Time},
-		    {output, list_to_binary(lists:reverse(hd(Buf)))}],
+	    Data = [{time, Time}, {output, buffer_to_binary(hd(Buf))}],
 	    message_super(Id, {progress, 'end', {Status, Data}}, St),
 	    insulator_wait(Child, Parent, tl(Buf), St);
 	{child, Child, Id, {skipped, Reason}} ->
@@ -246,10 +247,13 @@ insulator_wait(Child, Parent, Buf, St) ->
 	    terminate_insulator(St);
 	{io_request, Child, ReplyAs, Req} ->
 	    %% we only collect output from the child process itself, not
-	    %% from secondary processes; otherwise we get race problems
+	    %% from secondary processes, otherwise we get race problems;
+	    %% however, each test runs its personal group leader that
+	    %% funnels all output - see the run_test() function
 	    Buf1 = io_request(Child, ReplyAs, Req, hd(Buf)),
 	    insulator_wait(Child, Parent, [Buf1 | tl(Buf)], St);
 	{io_request, From, ReplyAs, Req} when is_pid(From) ->
+	    %% (this shouldn't happen anymore, but we keep it safe)
 	    %% just ensure the sender gets a reply; ignore the data
 	    io_request(From, ReplyAs, Req, []),
 	    insulator_wait(Child, Parent, Buf, St);
@@ -269,6 +273,9 @@ insulator_wait(Child, Parent, Buf, St) ->
 kill_task(Child, St) ->
     exit(Child, kill),
     terminate_insulator(St).
+
+buffer_to_binary([B]) when is_binary(B) -> B;  % avoid unnecessary copying
+buffer_to_binary(Buf) -> list_to_binary(lists:reverse(Buf)).
 
 %% Unlinking before exit avoids polluting the parent process with exit
 %% signals from the insulator. The child process is already dead here.
@@ -469,8 +476,25 @@ handle_test(T, St) ->
     Data = [{desc, T#test.desc}, {source, T#test.location},
 	    {line, T#test.line}],
     message_insulator({'begin', test, Data}, St),
+
+    %% each test case runs under a fresh group leader process
+    G0 = group_leader(),
+    Runner = self(),
+    G1 = new_group_leader(Runner),
+    group_leader(G1, self()),
+
+    %% run the actual test, handling timeouts and getting the total run
+    %% time of the test code (and nothing else)
     {Status, Time} = with_timeout(T#test.timeout, ?DEFAULT_TEST_TIMEOUT,
 				  fun () -> run_test(T) end, St),
+
+    %% restore group leader, get the collected output, and re-emit it so
+    %% that it all seems to come from this process, and always comes
+    %% before the 'end' message for this test
+    group_leader(G0, self()),
+    Output = group_leader_sync(G1),
+    io:put_chars(Output),
+
     message_insulator({'end', Status, Time}, St),
     ok.
 
@@ -538,7 +562,50 @@ with_context(#group{context = undefined, tests = T}, F) ->
 with_context(#group{context = #context{} = C, tests = I}, F) ->
     eunit_data:enter_context(C, I, F).
 
-%% Implementation of buffering I/O for the insulator process. (Note that
+%% Group leader process for test cases - collects I/O output requests.
+
+new_group_leader(Runner) ->
+    %% We must use spawn/3 here (with explicit module and function
+    %% name), because the 'current function' status of the group leader
+    %% is used by the UNDER_EUNIT macro (in eunit.hrl). If we spawn
+    %% using a fun, the current function will be 'erlang:apply/2' during
+    %% early process startup, which will fool the macro.
+    spawn_link(?MODULE, group_leader_process, [Runner]).
+
+group_leader_process(Runner) ->
+    group_leader_loop(Runner, infinity, []).
+
+group_leader_loop(Runner, Wait, Buf) ->
+    receive
+	{io_request, From, ReplyAs, Req} ->
+	    P = process_flag(priority, normal),
+	    %% run this part under normal priority always
+	    Buf1 = io_request(From, ReplyAs, Req, Buf),
+	    process_flag(priority, P),
+	    group_leader_loop(Runner, Wait, Buf1);
+	stop ->
+	    %% quitting time: make a minimal pause, go low on priority,
+	    %% set receive-timeout to zero and schedule out again
+	    receive after 2 -> ok end,
+	    process_flag(priority, low),
+	    group_leader_loop(Runner, 0, Buf);
+	_ ->
+	    %% discard any other messages
+	    group_leader_loop(Runner, Wait, Buf)
+    after Wait ->
+	    %% no more messages and nothing to wait for; we ought to
+	    %% have collected all immediately pending output now
+	    process_flag(priority, normal),
+	    Runner ! {self(), buffer_to_binary(Buf)}
+    end.
+
+group_leader_sync(G) ->
+    G ! stop,
+    receive
+	{G, Buf} -> Buf
+    end.
+
+%% Implementation of buffering I/O for group leader processes. (Note that
 %% each batch of characters is just pushed on the buffer, so it needs to
 %% be reversed when it is flushed.)
 

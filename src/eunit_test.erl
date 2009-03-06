@@ -181,6 +181,8 @@ macro_test_() ->
 		     = run_testfun(F)
  	     end)
      ]}.
+
+under_eunit_test() -> ?assert(?UNDER_EUNIT).
 -endif.
 
 

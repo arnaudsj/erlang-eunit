@@ -21,11 +21,17 @@
 %% is defined before the file is included. If both NOTEST and TEST are
 %% already defined, then TEST takes precedence, and NOTEST will become
 %% undefined.
+%% 
+%% If NODEBUG is defined before this file is included, the debug macros
+%% are disabled, unless DEBUG is also defined, in which case NODEBUG
+%% will become undefined. NODEBUG also implies NOASSERT, unless testing
+%% is enabled.
 %%
 %% If including this file causes TEST to be defined, then NOASSERT will
-%% be undefined, even if it was previously defined. If both ASSERT and
-%% NOASSERT are defined before the file is included, then ASSERT takes
-%% precedence, and NOASSERT will become undefined regardless of TEST.
+%% be undefined, even if it was previously defined and even if NODEBUG
+%% is defined. If both ASSERT and NOASSERT are defined before the file
+%% is included, then ASSERT takes precedence, and NOASSERT will become
+%% undefined regardless of TEST.
 %% 
 %% After including this file, EUNIT will be defined if and only if TEST
 %% is defined.
@@ -36,6 +42,11 @@
 %% allow defining TEST to override NOTEST
 -ifdef(TEST).
 -undef(NOTEST).
+-endif.
+
+%% allow defining DEBUG to override NODEBUG
+-ifdef(DEBUG).
+-undef(NODEBUG).
 -endif.
 
 %% allow NODEBUG to imply NOASSERT, unless overridden below

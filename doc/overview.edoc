@@ -16,7 +16,7 @@
 and flexible, is easy to use, and has small syntactical overhead.
 
 <ul>
-<li>{@section Unit Testing}</li>
+<li>{@section Unit testing}</li>
 <li>{@section Terminology}</li>
 <li>{@section Getting started}</li>
 <li>{@section EUnit macros}</li>
@@ -36,7 +36,7 @@ require changing existing code. Furthermore, tests that only exercise
 the exported functions of a module can always be placed in a completely
 separate module, avoiding any conflicts entirely.
 
-== Unit Testing ==
+== Unit testing ==
 
 Unit Testing is testing of individual program "units" in relative
 isolation. There is no particular size requirement: a unit can be a
@@ -276,7 +276,7 @@ generator functions), so that it can be included in the test report if
 errors occur. To bypass EUnit and print text directly to the console
 while testing, you can write to the `user' output stream, as in
 `io:format(user, "~w", [Term])'. The recommended way of doing this is to
-use the EUnit {@section Debugging Macros}, which make it much simpler.
+use the EUnit {@section Debugging macros}, which make it much simpler.
 
 === Writing test generating functions ===
 
@@ -417,7 +417,7 @@ your code is compiled with testing enabled or disabled.
 <li>{@section Utility macros}</li>
 <li>{@section Assert macros}</li>
 <li>{@section Macros for running external commands}</li>
-<li>{@section Debugging Macros}</li>
+<li>{@section Debugging macros}</li>
 </ul>
 
 === Basic macros ===
@@ -445,6 +445,12 @@ e.g., to ensure that the code can be compiled without including the
 EUnit header file, when testing is disabled. See also the macros `TEST'
 and `NOTEST'.
 </dd>
+
+<dt>`EUNIT_NOAUTO'</dt>
+<dd>If this macro is defined, the automatic exporting or stripping of
+test functions will be disabled.
+</dd>
+
 <dt>`TEST'</dt>
 <dd>This macro is always defined (to `true', unless previously defined
 by the user to have another value) whenever EUnit is enabled at compile
@@ -461,6 +467,7 @@ The `TEST' macro can also be used to override the `NOTEST' macro. If
 included (even if `NOTEST' is also defined), then the code will be
 compiled with EUnit enabled.
 </dd>
+
 <dt>`NOTEST'</dt>
 <dd>This macro is always defined (to `true', unless previously defined
 by the user to have another value) whenever EUnit is <em>disabled</em>
@@ -473,9 +480,27 @@ is <em>not</em> defined, then the code will be compiled with EUnit
 disabled. See also {@section Disabling testing}.
 </dd>
 
-<dt>`EUNIT_NOAUTO'</dt>
-<dd>If this macro is defined, the automatic exporting or stripping of
-test functions will be disabled.
+<dt>`NOASSERT'</dt>
+<dd>If this macro is defined, the assert macros will have no effect,
+when testing is also disabled. See {@section Assert macros}. When
+testing is enabled, the assert macros are always enabled automatically
+and cannot be disabled.
+</dd>
+
+<dt>`ASSERT'</dt>
+<dd>If this macro is defined, it overrides the NOASSERT macro, forcing
+the assert macros to always be enabled regardless of other settings.
+</dd>
+
+<dt>`NODEBUG'</dt>
+<dd>If this macro is defined, the debugging macros will have no effect.
+See {@section Debugging macros}. `NODEBUG' also implies `NOASSERT',
+unless testing is enabled.
+</dd>
+
+<dt>`DEBUG'</dt>
+<dd>If this macro is defined, it overrides the NODEBUG macro, forcing
+the debugging macros to be enabled.
 </dd>
 </dl>
 
@@ -504,6 +529,10 @@ that it is an error if `Cond' does not yield a boolean value.
 an "`_'" (underscore) character, as in `?_assert(BoolExpr)', that create
 a "test object" instead of performing the test immediately. This is
 equivalent to writing `?_test(assert(BoolExpr))', etc.)
+
+If the macro `NOASSERT' is defined before the EUnit header file is
+included, these macros have no effect when testing is also disabled; see
+{@section Compilation control macros} for details.
 
 <dl>
 <dt>`assert(BoolExpr)'</dt>
@@ -629,7 +658,7 @@ A Unix-specific example:
 </dd>
 </dl>
 
-=== Debugging Macros ===
+=== Debugging macros ===
 
 To help with debugging, EUnit defines several useful macros for printing
 messages directly to the console (rather than to the standard output).
@@ -640,7 +669,8 @@ to simply click on the message and jump directly to the corresponding
 line in the code.
 
 If the macro `NODEBUG' is defined before the EUnit header file is
-included, these macros have no effect.
+included, these macros have no effect; see
+{@section Compilation control macros} for details.
 
 <dl>
 <dt>`debugHere'</dt>

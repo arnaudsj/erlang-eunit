@@ -211,7 +211,7 @@ event_logger(LogFile) ->
 event_logger_loop(Reference, FD) ->
     receive
 	{status, _Id, _Info}=Msg ->
-	    io:fwrite(FD, "~w.\n", [Msg]),
+	    io:fwrite(FD, "~p.\n", [Msg]),
 	    event_logger_loop(Reference, FD);
 	{stop, Reference, _ReplyTo} ->
 	    %% no need to reply, just exit

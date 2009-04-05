@@ -409,6 +409,9 @@ wait_for_tasks(PidSet, St) ->
 %% ---------------------------------------------------------------------
 %% Separate testing process
 
+%% TODO: Ability to stop after N failures.
+%% TODO: Flow control, starting new job as soon as slot is available
+
 tests(T, St) ->
     I = eunit_data:iter_init(T, St#procstate.id),
     case St#procstate.order of

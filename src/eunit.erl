@@ -39,6 +39,8 @@
 
 %% EUnit entry points
 
+%% TODO: Command line interface similar to that of edoc?
+
 %% @doc Starts the EUnit server. Normally, you don't need to call this
 %% function; it is started automatically.
 start() ->

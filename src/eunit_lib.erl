@@ -354,6 +354,9 @@ uniq_test_() ->
 %% ---------------------------------------------------------------------
 %% Replacement for os:cmd
 
+%% TODO: Better cmd support, especially on Windows (not much tested)
+%% TODO: Can we capture stderr separately somehow?
+
 command(Cmd) ->
     command(Cmd, "").
 

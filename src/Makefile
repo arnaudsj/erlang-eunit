@@ -22,6 +22,7 @@ SOURCES= \
 	eunit_data.erl \
 	eunit_server.erl \
 	eunit_tty.erl \
+	eunit_surefire.erl \
 	eunit_tests.erl \
 	code_monitor.erl \
 	file_monitor.erl \

@@ -121,7 +121,7 @@ test(Tests) ->
 %% section <a
 %% href="overview-summary.html#EUnit_test_representation">EUnit test
 %% representation</a> of the overview.
-%% 
+%%
 %% Example: ```eunit:test(fred)''' runs all tests in the module `fred'
 %% and also any tests in the module `fred_tests', if that module exists.
 %%
@@ -155,7 +155,7 @@ test_run(Reference, Listeners) ->
     receive
 	{done, Reference} ->
 	    cast(Listeners, {stop, Reference, self()}),
-	    receive 
+	    receive
 		{result, Reference, Result} ->
 		    Result
 	    end
@@ -185,16 +185,24 @@ submit(Server, T, Options) ->
     eunit_server:start_test(Server, Dummy, T, Options).
 
 listeners(Options) ->
-    Ls = proplists:get_all_values(listen, Options),
+    Ps = start_listeners(proplists:get_all_values(report, Options)),
+    %% the event_log option is for debugging, to view the raw events
     case proplists:get_value(event_log, Options) of
 	undefined ->
-	    Ls;
+	    Ps;
 	X ->
 	    LogFile = if is_list(X) -> X;
 			 true -> "eunit-events.log"
 		      end,
-	    [spawn_link(fun () -> event_logger(LogFile) end) | Ls]
+	    [spawn_link(fun () -> event_logger(LogFile) end) | Ps]
     end.
+
+start_listeners([P | Ps]) when is_pid(P) ; is_atom(P) ->
+    [P | start_listeners(Ps)];
+start_listeners([{Mod, Opts} | Ps]) when is_atom(Mod) ->
+    [Mod:start(Opts) | start_listeners(Ps)];	    
+start_listeners([]) ->
+    [].
 
 %% TODO: make this report file errors
 event_logger(LogFile) ->

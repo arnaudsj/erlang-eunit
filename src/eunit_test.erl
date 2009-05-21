@@ -131,7 +131,7 @@ macro_test_() ->
 				[{module,_},
 				 {line,_},
 				 {expression,_},
-				 {expected,"[ _ ]"},
+				 {pattern,"[ _ ]"},
 				 {value,[]}]},
 			 _}}
 		     = run_testfun(F)
@@ -162,7 +162,7 @@ macro_test_() ->
 				[{module,_},
 				 {line,_},
 				 {expression,_},
-				 {expected,_},
+				 {pattern,_},
 				 {unexpected_success,ok}]},
 			 _}}
 		     = run_testfun(F)
@@ -174,7 +174,7 @@ macro_test_() ->
 				[{module,_},
 				 {line,_},
 				 {expression,_},
-				 {expected,_},
+				 {pattern,_},
 				 {unexpected_exception,
 				  {error,badarith,_}}]},
 			 _}}

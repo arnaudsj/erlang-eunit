@@ -174,7 +174,7 @@
 				      [{module, ?MODULE},
 				       {line, ?LINE},
 				       {expression, (??Expr)},
-				       {expected, (??Guard)},
+				       {pattern, (??Guard)},
 				       {value, __V}]})
 	    end
 	  end)())).
@@ -212,7 +212,7 @@
 				      [{module, ?MODULE},
 				       {line, ?LINE},
 				       {expression, (??Expr)},
-				       {expected,
+				       {pattern,
 					"{ "++(??Class)++" , "++(??Term)
 					++" , [...] }"},
 				       {unexpected_success, __V}]})
@@ -223,7 +223,7 @@
 				   [{module, ?MODULE},
 				    {line, ?LINE},
 				    {expression, (??Expr)},
-				    {expected,
+				    {pattern,
 				     "{ "++(??Class)++" , "++(??Term)
 				     ++" , [...] }"},
 				    {unexpected_exception,

@@ -25,4 +25,4 @@ docs:
 
 test: subdirs
 	@echo Testing...
-	@erl -noshell -pa ebin -s eunit test -s init stop
+	@erl -noshell -pa ebin -eval 'eunit:test({application,eunit})' -s init stop

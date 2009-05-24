@@ -13,7 +13,7 @@
 %% Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 %% USA
 %%
-%% $Id:$ 
+%% $Id$ 
 %%
 %% @author Richard Carlsson <richard@it.uu.se>
 %% @copyright 2007 Richard Carlsson
@@ -26,20 +26,17 @@
 -include("eunit.hrl").
 
 -ifdef(TEST).
-%% Cause all the other modules to be tested as well as this one.
-full_test_() ->
-    %%{application, eunit}.    % this currently causes a loop
-    %% We use the below until loop detection is implemented
-    [eunit_autoexport,
-     eunit_striptests,
-     eunit_server,
-     eunit_proc,
-     eunit_serial,
-     eunit_test,
-     eunit_lib,
-     eunit_data,
-     eunit_tty,
-     code_monitor,
-     file_monitor,
-     autoload].
+id(X) -> X.  % for suppressing compiler warnings
 -endif.
+
+under_eunit_test() -> ?assert(?UNDER_EUNIT).
+
+let_test() -> ?assertEqual(42, ?LET(X, 17, X+25)).
+
+if_test_() ->
+    [?_assertEqual(17, ?IF(id(1) > 0, 17, 42)),
+     ?_assertEqual(42, ?IF(id(1) < 0, 17, 42))].
+
+matches_test_() ->
+    [?_assert(?MATCHES("hel"++_, "hello")),
+     ?_assertNot(?MATCHES("hal"++_, "hello"))].

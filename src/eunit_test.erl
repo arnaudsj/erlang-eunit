@@ -137,6 +137,21 @@ macro_test_() ->
 		     = run_testfun(F)
  	     end),
       ?_test(begin
+ 		 {?LINE, F} = ?_assertNotMatch(ok, error),
+ 		 {ok, ok} = run_testfun(F)
+ 	     end),
+      ?_test(begin
+ 		 {?LINE, F} = ?_assertNotMatch([_], [42]),
+ 		 {error,{error,{assertNotMatch_failed,
+				[{module,_},
+				 {line,_},
+				 {expression,_},
+				 {pattern,"[ _ ]"},
+				 {value,[42]}]},
+			 _}}
+		     = run_testfun(F)
+ 	     end),
+      ?_test(begin
  		 {?LINE, F} = ?_assertEqual(ok, ok),
  		 {ok, ok} = run_testfun(F)
  	     end),
@@ -147,6 +162,20 @@ macro_test_() ->
 				 {line,_},
 				 {expression,_},
 				 {expected,3},
+				 {value,2}]},
+			 _}}
+		     = run_testfun(F)
+ 	     end),
+      ?_test(begin
+ 		 {?LINE, F} = ?_assertNotEqual(1, 0),
+ 		 {ok, ok} = run_testfun(F)
+ 	     end),
+      ?_test(begin
+ 		 {?LINE, F} = ?_assertNotEqual(2, 1+1),
+ 		 {error,{error,{assertNotEqual_failed,
+				[{module,_},
+				 {line,_},
+				 {expression,_},
 				 {value,2}]},
 			 _}}
 		     = run_testfun(F)
@@ -179,10 +208,43 @@ macro_test_() ->
 				  {error,badarith,_}}]},
 			 _}}
 		     = run_testfun(F)
+ 	     end),
+      ?_test(begin
+ 		 {?LINE, F} = ?_assertError(badarith,
+					    erlang:error(badarith)),
+ 		 {ok, ok} = run_testfun(F)
+ 	     end),
+      ?_test(begin
+ 		 {?LINE, F} = ?_assertExit(normal, exit(normal)),
+ 		 {ok, ok} = run_testfun(F)
+ 	     end),
+      ?_test(begin
+ 		 {?LINE, F} = ?_assertThrow(foo, throw(foo)),
+ 		 {ok, ok} = run_testfun(F)
+ 	     end),
+      ?_test(begin
+ 		 {?LINE, F} = ?_assertNotException(error, badarith, 42),
+ 		 {ok, ok} = run_testfun(F)
+ 	     end),
+      ?_test(begin
+ 		 {?LINE, F} = ?_assertNotException(error, badarith,
+						   erlang:error(badarg)),
+ 		 {ok, ok} = run_testfun(F)
+ 	     end),
+      ?_test(begin
+ 		 {?LINE, F} = ?_assertNotException(error, badarith,
+						   erlang:error(badarith)),
+ 		 {error,{error,{assertNotException_failed,
+				[{module,_},
+				 {line,_},
+				 {expression,_},
+				 {pattern,_},
+				 {unexpected_exception,
+				  {error,badarith,_}}]},
+			 _}}
+		     = run_testfun(F)
  	     end)
      ]}.
-
-under_eunit_test() -> ?assert(?UNDER_EUNIT).
 -endif.
 
 

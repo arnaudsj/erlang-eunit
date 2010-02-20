@@ -20,7 +20,7 @@
 %%
 %% NOTE: An object file that uses the macros in this header file shall
 %% never be considered a derived work under the the LGPL; these macros
-%% shall be regarded as "small", regardless of the actual line count.
+%% shall be regarded as "small" regardless of the exact line count.
 %%
 %% $Id$
 %%
@@ -405,7 +405,8 @@
 -else.
 -define(debugMsg(S),
 	(begin
-	     .io:fwrite(user, <<"~s:~w: ~s\n">>, [?FILE, ?LINE, S]),
+	     .io:fwrite(user, <<"~s:~w:~w: ~s\n">>,
+                        [?FILE, ?LINE, self(), S]),
 	     ok
 	 end)).
 -define(debugHere, (?debugMsg("<-"))).
